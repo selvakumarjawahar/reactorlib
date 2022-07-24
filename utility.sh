@@ -104,7 +104,7 @@ run_clang_format()
 run_unit_tests()
 {
     log "[INFO] Running Unit Tests"
-    # clean
+    clean
     mkdir -p build
     compile_debug
     docker run --rm -v "$(pwd):/share" -u $(id -u):$(id -g) -w "/share" ${DOCKER_URL} /bin/bash -c "cd build &&  ctest --verbose"
