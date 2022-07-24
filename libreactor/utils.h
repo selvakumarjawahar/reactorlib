@@ -5,10 +5,9 @@
 namespace lib_reactor {
 enum class ErrorCode {
     Ok,
-    EventExists,
-    EventDoesNotExists,
-    InvalidEventHandler,
     EpollCreateError,
+    EpollAddError,
+    EpollDelError,
     UnknownError
 };
 }

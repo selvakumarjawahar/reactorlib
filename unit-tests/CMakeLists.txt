@@ -1,7 +1,6 @@
 add_executable(test_reactor
-	${PROJECT_SOURCE_DIR}/unit-tests/reactor_test/test_main.cpp
-	${PROJECT_SOURCE_DIR}/unit-tests/reactor_test/test_demux_dispatch.cpp
-	${PROJECT_SOURCE_DIR}/unit-tests/reactor_test/test_reactor.cpp)
+	${PROJECT_SOURCE_DIR}/unit-tests/test_main.cpp
+	${PROJECT_SOURCE_DIR}/unit-tests/test_reactor.cpp)
 
 target_compile_options(test_reactor PRIVATE  ${GCC_COMPILE_FLAGS} -g -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(test_reactor PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)

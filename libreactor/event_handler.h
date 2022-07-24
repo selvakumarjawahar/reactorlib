@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 namespace lib_reactor {
 template <typename HANDLE_TYPE, typename EVENT_TYPE>
 class EventHandlerInterface {
@@ -9,4 +10,5 @@ public:
 protected:
     virtual ~EventHandlerInterface() {};
 };
+using EpollHandlerInterface = EventHandlerInterface<int, uint32_t>;
 }

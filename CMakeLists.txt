@@ -15,10 +15,13 @@ set (REACTOR_SRCS
 	${PROJECT_SOURCE_DIR}/libreactor/reactor.h
 	${PROJECT_SOURCE_DIR}/libreactor/reactor.cpp
 	${PROJECT_SOURCE_DIR}/libreactor/event_handler.h
-	${PROJECT_SOURCE_DIR}/libreactor/handler_map.h
 	${PROJECT_SOURCE_DIR}/libreactor/utils.h)
 
-find_package(spdlog REQUIRED)
+set (TEST_SRCS
+	${PROJECT_SOURCE_DIR}/unit-tests/test_main.cpp
+	${PROJECT_SOURCE_DIR}/unit-tests/test_reactor.cpp
+)
+
 
 # Adding reactor library
 add_library(libreactor 
@@ -26,27 +29,23 @@ add_library(libreactor
 
 target_compile_options(libreactor PRIVATE  ${GCC_COMPILE_FLAGS})
 
-target_link_libraries(libreactor
-		PRIVATE spdlog::spdlog)
-
-
 add_custom_target(
-	clang-tidy-check clang-tidy -extra-arg=-Wno-unknown-warning-option -p ${CMAKE_BINARY_DIR}/compile_commands.json -header-filter=.* ${CRYPTO_SRCS} ${REACTOR_SRCS} ${BROKER_SRCS}
-	DEPENDS ${CRYPTO_SRCS} ${REACTOR_SRCS} ${BROKER_SRCS} )
+	clang-tidy-check clang-tidy -extra-arg=-Wno-unknown-warning-option -p ${CMAKE_BINARY_DIR}/compile_commands.json -header-filter=.* ${REACTOR_SRCS} ${TEST_SRCS}
+	DEPENDS ${REACTOR_SRCS} ${TEST_SRCS} )
 
 add_custom_target(
         clangformat
-		COMMAND clang-format -style=WebKit -i ${CRYPTO_SRCS} ${REACTOR_SRCS} ${BROKER_SRCS}
-		DEPENDS ${CRYPTO_SRCS} ${REACTOR_SRCS} ${BROKER_SRCS}
+		COMMAND clang-format -style=WebKit -i ${REACTOR_SRCS} ${TEST_SRCS}
+		DEPENDS ${REACTOR_SRCS} ${TEST_SRCS}
 )
 
-# add_subdirectory(unit-tests)
+add_subdirectory(unit-tests)
 
-# enable_testing()
+enable_testing()
 
-# add_test(
-#   NAME unit_test_reactor
-#  COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=check_initialization_order=true:strict_init_order=true 
-#  $<TARGET_FILE:test_reactor>) 
+add_test(
+NAME unit_test_reactor
+COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=check_initialization_order=true:strict_init_order=true 
+$<TARGET_FILE:test_reactor>) 
 
 

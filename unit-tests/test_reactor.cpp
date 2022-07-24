@@ -1,222 +1,102 @@
-#include <catch2/catch.hpp>
 #include "event_handler.h"
+#include "reactor.h"
 #include "utils.h"
-#include "zmq_reactor.h"
+#include <catch2/catch.hpp>
 
-#include <memory>
-#include <zmq.hpp>
+#include <errno.h>
 #include <exception>
-#include <string>
+#include <fcntl.h>
 #include <iostream>
-
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <thread>
-#include <chrono>
-#include <zmq_addon.hpp>
+#include <unistd.h>
 
-using namespace iris_reactor;
+const std::string Sensor_FIFO { "/tmp/sensor_fifo" };
+using namespace lib_reactor;
 
-const std::string connection_string_pub_sub = "inproc://127.0.0.1:5563";
-const std::string connection_string_dealer_router = "inproc://127.0.0.1:5671";
-
-const std::string test_msg_pub_sub = "This is a pub sub zmq test";
-const std::string test_msg_router_dealer = "This is a router dealer zmq test";
-
-class ZMQSubEventHandler : public EventHandlerInterface<zmq::socket_ref,
-                                                         zmq::event_flags> {
+class SensorHandler : public EpollHandlerInterface {
 public:
-
-  ZMQSubEventHandler(zmq::context_t& ctx, zmq::event_flags event_type,
-                      ZMQReactor& reactor_ref) :
-    sub_socket{ctx, zmq::socket_type::sub},
-    sub_socket_ref{sub_socket},
-    event{event_type},
-    reactor{reactor_ref}
-  {
-    sub_socket.connect(connection_string_pub_sub);
-    sub_socket.set(zmq::sockopt::subscribe, "");
-  }
-
-  void HandleEvent(zmq::event_flags event) noexcept override
-  {
-    if (event != this->event) return;
-
-    event_called++;
-    zmq::message_t msg;
-    const auto ret = sub_socket.recv(msg, zmq::recv_flags::none);
-    if (ret.has_value())
+    explicit SensorHandler(EpollReactor& reactor)
+        : reactor_ref { reactor }
     {
-      msg_str = msg.to_string();
-      reactor.RemoveEvent(this);
+        read_fifo_fd = open(Sensor_FIFO.c_str(), O_RDONLY | O_NONBLOCK);
+        if (read_fifo_fd < 0) {
+            std::string err_str { strerror(errno) };
+            throw err_str;
+        }
     }
-  }
 
-  zmq::socket_ref GetHandle() const noexcept override
-  {
-    return sub_socket_ref;
-  }
+    void HandleEvent(uint32_t event) noexcept override
+    {
+        if (!(event & EPOLLIN)) {
+            std::cout << "wrong event = " << event << '\n';
+            return;
+        }
+        const auto result = read(read_fifo_fd, &recvd_val, sizeof(char));
+        if (result < 0) {
+            std::cerr << "Error in Reading: " << strerror(errno) << '\n';
+            return;
+        }
+        /*
+         * In real application, here we will do the handling of the read data.
+         * In testing we want to end the event loop, so we will remove this 
+         * handler from reactor.
+         */
+        reactor_ref.RemoveHandler(this);
+    }
 
-  int GetEventCalledCount() const noexcept
-  {
-    return event_called;
-  }
+    int GetHandle() const noexcept override
+    {
+        return read_fifo_fd;
+    }
 
-  std::string GetMsgString() const noexcept
-  {
-    return msg_str;
-  }
+    char GetRecvdVal() const noexcept
+    {
+        return recvd_val;
+    }
+
+    ~SensorHandler()
+    {
+        close(read_fifo_fd);
+    }
 
 private:
-
-  zmq::socket_t sub_socket;
-  zmq::socket_ref sub_socket_ref;
-  zmq::event_flags event;
-  ZMQReactor& reactor;
-  int event_called = 0;
-  std::string msg_str;
+    EpollReactor& reactor_ref;
+    int read_fifo_fd = -1;
+    char recvd_val = 0;
 };
 
-static void pub_send(zmq::context_t& ctx)
+void simulate_sensor(char send_val)
 {
-  zmq::socket_t pub_socket{ ctx, zmq::socket_type::pub };
-
-  pub_socket.bind(connection_string_pub_sub);
-  pub_socket.send(zmq::buffer(test_msg_pub_sub),
-                  zmq::send_flags::dontwait);
-}
-
-
-class ZMQRouterEventHandler : public EventHandlerInterface<zmq::socket_ref,
-                                                         zmq::event_flags> {
-public:
-
-  ZMQRouterEventHandler(zmq::context_t& ctx, zmq::event_flags event_type,
-                      ZMQReactor& reactor_ref) :
-    router_socket{ctx, zmq::socket_type::router},
-    router_socket_ref{router_socket},
-    event{event_type},
-    reactor{reactor_ref}
-  {
-    router_socket.bind(connection_string_dealer_router);
-  }
-
-  void HandleEvent(zmq::event_flags event) noexcept override
-  {
-    if (event != this->event) return;
-
-    event_called++;
-    zmq::multipart_t msg(router_socket);
-    if (msg.size() > 0)
-    {
-      msg_str = msg.back().to_string();
-      reactor.RemoveEvent(this);
+    int write_fifo_fd = open(Sensor_FIFO.c_str(), O_WRONLY);
+    if (write_fifo_fd < 0) {
+        std::cerr << "Error in opening the write fd: " << strerror(errno) << '\n';
+        return;
     }
-  }
-
-  zmq::socket_ref GetHandle() const noexcept override
-  {
-    return router_socket_ref;
-  }
-
-  int GetEventCalledCount() const noexcept
-  {
-    return event_called;
-  }
-
-  std::string GetMsgString() const noexcept
-  {
-    return msg_str;
-  }
-
-
-private:
-
-  zmq::socket_t router_socket;
-  zmq::socket_ref router_socket_ref;
-  zmq::event_flags event;
-  ZMQReactor& reactor;
-  int event_called = 0;
-  std::string msg_str;
-};
-
-static void dealer_send(zmq::context_t& ctx)
-{
-  zmq::socket_t dealer_socket{ ctx, zmq::socket_type::dealer };
-
-  dealer_socket.connect(connection_string_dealer_router);
-  dealer_socket.send(zmq::buffer(test_msg_router_dealer),
-                  zmq::send_flags::none);
+    const char val = send_val;
+    auto result = write(write_fifo_fd, &val, sizeof(char));
+    if (result < 0) {
+        std::cerr << "Error in writing data: " << strerror(errno) << '\n';
+        return;
+    }
+    close(write_fifo_fd);
 }
 
-
-TEST_CASE("AddingPubSub", "Check Adding pub sub socket")
+TEST_CASE("SmokeTest", "Simple Use case")
 {
-  using namespace std::chrono_literals;
-  zmq::context_t context;
-  ZMQReactor     reactor{};
-  auto zmq_sub_event1 = std::make_unique<ZMQSubEventHandler>(context,
-                                                              zmq::event_flags::pollin,
-                                                              reactor);
-  auto zmq_sub_event2 = std::make_unique<ZMQSubEventHandler>(context,
-                                                              zmq::event_flags::pollin,
-                                                              reactor);
-  CHECK(reactor.AddEvent(
-          zmq_sub_event1.get(), zmq::event_flags::pollin) == ErrorCode::Ok);
-  CHECK(reactor.AddEvent(
-          zmq_sub_event2.get(), zmq::event_flags::pollin) == ErrorCode::Ok);
- 
-  std::thread publisher{ pub_send, std::ref(context) };
-  CHECK(reactor.StartReactor(1000ms) == ErrorCode::Ok);
-  publisher.join();
-  CHECK(zmq_sub_event1->GetEventCalledCount() == 1);
-  CHECK(zmq_sub_event1->GetMsgString() == test_msg_pub_sub);
-  CHECK(zmq_sub_event2->GetEventCalledCount() == 1);
-  CHECK(zmq_sub_event2->GetMsgString() == test_msg_pub_sub);
-}
-
-
-TEST_CASE("AddingDealerRouter", "Check Adding dealer router socket")
-{
-  using namespace std::chrono_literals;
-  zmq::context_t context;
-  ZMQReactor     reactor{};
-  auto zmq_router_event1 = std::make_unique<ZMQRouterEventHandler>(context,
-                                                              zmq::event_flags::pollin,
-                                                              reactor);
- CHECK(reactor.AddEvent(
-          zmq_router_event1.get(), zmq::event_flags::pollin) == ErrorCode::Ok);
-
-  std::thread dealer{ dealer_send, std::ref(context) };
-  CHECK(reactor.StartReactor(1000ms) == ErrorCode::Ok);
-  dealer.join();
-  CHECK(zmq_router_event1->GetEventCalledCount() == 1);
-  CHECK(zmq_router_event1->GetMsgString() == test_msg_router_dealer);
-}
-
-TEST_CASE("AddingMixed", "Check Adding dealer router socket and pub sub")
-{
-  using namespace std::chrono_literals;
-  zmq::context_t context;
-  ZMQReactor     reactor{};
-  auto zmq_sub_event1 = std::make_unique<ZMQSubEventHandler>(context,
-                                                              zmq::event_flags::pollin,
-                                                              reactor);
- CHECK(reactor.AddEvent(
-          zmq_sub_event1.get(), zmq::event_flags::pollin) == ErrorCode::Ok);
- auto zmq_router_event1 = std::make_unique<ZMQRouterEventHandler>(context,
-                                                              zmq::event_flags::pollin,
-                                                              reactor);
- CHECK(reactor.AddEvent(
-          zmq_router_event1.get(), zmq::event_flags::pollin) == ErrorCode::Ok);
-
-
-  std::thread publisher{ pub_send, std::ref(context) };
-  std::thread dealer{ dealer_send, std::ref(context) };
-  CHECK(reactor.StartReactor(1000ms) == ErrorCode::Ok);
-  publisher.join();
-  dealer.join();
-  CHECK(zmq_sub_event1->GetEventCalledCount() == 1);
-  CHECK(zmq_sub_event1->GetMsgString() == test_msg_pub_sub);
-  CHECK(zmq_router_event1->GetEventCalledCount() == 1);
-  CHECK(zmq_router_event1->GetMsgString() == test_msg_router_dealer);
-
+    if (mkfifo(Sensor_FIFO.c_str(), 0666) < 0) {
+        CHECK(false);
+        return;
+    }
+    EpollReactor reactor;
+    SensorHandler sensor_handler { reactor };
+    CHECK(reactor.RegisterHandler(&sensor_handler) == ErrorCode::Ok);
+    const char to_send = '5';
+    std::thread simulator { simulate_sensor, to_send };
+    reactor.HandleEvents();
+    simulator.join();
+    CHECK(sensor_handler.GetRecvdVal() == to_send);
 }
