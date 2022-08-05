@@ -17,8 +17,6 @@ show_help()
     cat << EOF
     Options
     -r|--build-release     : Does a clean build, runs tests and creates release package. Use this option to prepare a release package.
-    -d|--build-docker      : Builds all required Docker images
-    -e|--push-docker       : Builds all required Docker images and pushes to docker hub
     -c|--compile           : Compiles the code in Debug mode. Use this option for development
     -u|--unit-test         : Runs unit tests
     -s|--static-analysis   : Runs static analysis
@@ -61,25 +59,6 @@ check_executable()
 check_env()
 {
     check_executable docker
-}
-
-build_docker()
-{
-    log "[INFO] Build docker"
-    check_dir docker
-    cd docker
-    check_file Dockerfile
-    log "[INFO] Going for docker build"
-    docker build -t ${DOCKER_URL} .
-    log "[INFO] Docker Build Successfully"
-    cd -
-}
-
-push_docker()
-{
-    log "[INFO] Pushing docker image to docker hub"
-    docker image inspect ${DOCKER_URL} >/dev/null 2>&1 && docker push ${DOCKER_URL} || die_with_error "Docker image ${DOCKER_URL} does not exists"
-    log "[INFO] Docker pushed successfully"
 }
 
 compile_debug()
@@ -145,15 +124,6 @@ main()
         case "$1" in
             -r|--build-release)
                 build_release
-                exit 0
-                ;;
-            -d|--build-docker)
-                build_docker
-                exit 0
-                ;;
-            -e|--push-docker)
-                build_docker
-                push_docker
                 exit 0
                 ;;
            -c|--compile)
