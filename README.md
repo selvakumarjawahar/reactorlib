@@ -1,6 +1,6 @@
 # reactorlib
 
-This project was created from my [cppcon India 2022](https://www.cppindia.co.in/) talk. This project implements a simple reactor using epoll. The code is documented and easy to understand. Check the unit tests for sample usage. Watch the talk for more details on the reactor pattern.
+This project was created for my [cppcon India 2022](https://www.cppindia.co.in/) talk. This project implements a simple reactor using epoll. The code is documented and easy to understand. Check the unit tests for sample usage. Watch the talk for more details on the reactor pattern.
 
 ## Build
 
