@@ -20,4 +20,4 @@ make
 ```
 
 <br>
-The only requirement for the library is C++17 compiler. The unit tests uses catch2, so you will need to install catch 2.x as well for running unit tests.
+The only requirement for the library is C++17 compiler. The unit tests uses catch2.x, address sanitizer (libasan), ub sanitizer(ubsan). So you will need to install all these dependencies as well for running unit tests.
