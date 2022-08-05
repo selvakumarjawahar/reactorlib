@@ -10,6 +10,7 @@ As this project is using epoll, this library will work only on linux machines. T
 ```
 <br>
 for help. This script uses docker for building the library and run tests. If you do not want to use docker for build, you can build using cmake. <br>
+
 ```bash
 cd reactorlib
 mkdir build
@@ -17,5 +18,6 @@ cd build
 cmake ..
 make
 ```
+
 <br>
 The only requirement for the library is C++17 compiler. The unit tests uses catch2, so you will need to install catch 2.x as well for running unit tests.
