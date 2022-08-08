@@ -39,7 +39,7 @@ public:
 
 private:
     int epoll_fd;
-    int event_count = 0;
+    int handlers_count = 0;
 };
 
 }

@@ -24,7 +24,7 @@ ErrorCode EpollReactor::RegisterHandler(
     if (result) {
         return ErrorCode::EpollAddError;
     }
-    event_count++;
+    handlers_count++;
     return ErrorCode::Ok;
 }
 
@@ -36,7 +36,7 @@ ErrorCode EpollReactor::RemoveHandler(
     if (result) {
         return ErrorCode::EpollDelError;
     }
-    event_count--;
+    handlers_count--;
     return ErrorCode::Ok;
 }
 
@@ -45,7 +45,7 @@ void EpollReactor::HandleEvents() noexcept
     struct epoll_event events[MAX_EVENTS];
 
     while (true) {
-        if (event_count < 1) // If there are no events registered, exit the event loop
+        if (handlers_count < 1) // If there are no handlers registered, exit the event loop
             break;
         const auto event_count = epoll_wait(epoll_fd, events, MAX_EVENTS, EPOLL_TIMEOUT_MS);
         if (event_count > 0) {
@@ -54,7 +54,6 @@ void EpollReactor::HandleEvents() noexcept
                     reinterpret_cast<EpollHandlerInterface*>(events[i].data.ptr)->HandleEvent(events[i].events);
                 }
             }
-            break;
         }
     }
 }
