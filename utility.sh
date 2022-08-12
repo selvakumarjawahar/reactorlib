@@ -157,4 +157,4 @@ main()
     done
 }
 
-main $@
+main "$@"

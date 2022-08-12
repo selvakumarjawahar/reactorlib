@@ -19,6 +19,7 @@ RUN git clone https://github.com/catchorg/Catch2.git && \
          cd Catch2 && \
          git checkout v2.x && \
          cp -r single_include/catch2 /usr/include/ && \
+         cd .. && \
          rm -fr Catch2
 
 RUN curl -L -o boost_1_78_0.tar.gz https://boostorg.jfrog.io/artifactory/main/release/1.78.0/source/boost_1_78_0.tar.gz && \

@@ -22,10 +22,10 @@ public:
      * want to provide copy or move semantic for our epoll resource.
      */
     EpollReactor();
-    EpollReactor(EpollReactor&) = delete;
-    EpollReactor(EpollReactor&&) = delete;
-    EpollReactor& operator=(EpollReactor&) = delete;
-    EpollReactor& operator=(EpollReactor&&) = delete;
+    EpollReactor(const EpollReactor&) = delete;
+    EpollReactor(const EpollReactor&&) = delete;
+    EpollReactor& operator=(const EpollReactor&) = delete;
+    EpollReactor& operator=(const EpollReactor&&) = delete;
     ~EpollReactor();
 
     // API used by application to register a handler.
